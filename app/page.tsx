@@ -33,7 +33,7 @@ export default async function Home({
   const accessToken = session.accessToken;
   
   // Inject the active time range dynamically into the fetch URL
-  const res = await fetch(`https://api.spotify.com/v1/me/top/tracks?time_range=${activeTimeRange}&limit=10`, {
+  const res = await fetch(`https://api.spotify.com/v1/me/top/tracks?time_range=${activeTimeRange}&limit=50`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
