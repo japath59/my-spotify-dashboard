@@ -8,7 +8,6 @@ export default async function Home({
 }: {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
-  // Grab the active session and the Access Token
   const session = await getServerSession(authOptions);
 
   if (!session) {
@@ -25,30 +24,32 @@ export default async function Home({
     );
   }
 
-  // Await search parameters (Next.js 15+ requirement) and determine the active tab
+  // Await search parameters and determine active tab states
   const resolvedParams = await searchParams;
   const activeTimeRange = (resolvedParams.time_range as string) || "short_term";
+  const activeType = (resolvedParams.type as string) || "tracks"; // defaults to tracks
 
   // @ts-expect-error - Grabbing our custom accessToken
   const accessToken = session.accessToken;
   
-  // Inject the active time range dynamically into the fetch URL
-  const res = await fetch(`https://api.spotify.com/v1/me/top/tracks?time_range=${activeTimeRange}&limit=50`, {
+  // Inject BOTH the active type (artists or tracks) and time range into the fetch URL
+  const res = await fetch(`https://api.spotify.com/v1/me/top/${activeType}?time_range=${activeTimeRange}&limit=50`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
   });
   
   const data = await res.json();
-  const topTracks = data.items || [];
+  const topItems = data.items || [];
 
-  // Determine dynamic title based on the active tab
-  const tabTitle = 
+  const timeTitle = 
     activeTimeRange === "long_term" ? "Lifetime" : 
     activeTimeRange === "medium_term" ? "Past 6 Months" : "Past Month";
+    
+  const typeTitle = activeType === "artists" ? "Top Artists" : "Top Tracks";
 
   return (
-    <main className="min-h-screen bg-zinc-950 text-white p-12">
+    <main className="min-h-screen bg-zinc-950 text-white p-8 md:p-12">
       <header className="flex justify-between items-center mb-12 border-b border-zinc-800 pb-6">
         <h1 className="text-4xl font-bold">Hello, {session.user?.name}</h1>
         <a href="/api/auth/signout" className="text-zinc-400 hover:text-white transition-colors">
@@ -57,59 +58,94 @@ export default async function Home({
       </header>
 
       <section>
-        <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4">
-          <h2 className="text-2xl font-semibold">Your Top Tracks ({tabTitle})</h2>
+        <div className="flex flex-col xl:flex-row xl:items-center justify-between mb-8 gap-6">
+          <h2 className="text-2xl font-semibold">Your {typeTitle} ({timeTitle})</h2>
           
-          {/* Clickable Tabs using Next.js Links */}
-          <div className="flex gap-2 bg-zinc-900 p-1 rounded-full">
-            <Link 
-              href="/?time_range=short_term" 
-              className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${
-                activeTimeRange === 'short_term' ? 'bg-green-500 text-black' : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              Past Month
-            </Link>
-            <Link 
-              href="/?time_range=medium_term" 
-              className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${
-                activeTimeRange === 'medium_term' ? 'bg-green-500 text-black' : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              Past 6 Months
-            </Link>
-            <Link 
-              href="/?time_range=long_term" 
-              className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${
-                activeTimeRange === 'long_term' ? 'bg-green-500 text-black' : 'text-zinc-400 hover:text-white'
-              }`}
-            >
-              Lifetime
-            </Link>
+          <div className="flex flex-col md:flex-row gap-4">
+            {/* TYPE TOGGLE: Tracks vs Artists (preserves current time_range) */}
+            <div className="flex gap-1 bg-zinc-900 p-1 rounded-full w-fit">
+              <Link 
+                href={`/?type=tracks&time_range=${activeTimeRange}`} 
+                className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${
+                  activeType === 'tracks' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                Tracks
+              </Link>
+              <Link 
+                href={`/?type=artists&time_range=${activeTimeRange}`} 
+                className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${
+                  activeType === 'artists' ? 'bg-white text-black' : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                Artists
+              </Link>
+            </div>
+
+            {/* TIME RANGE TOGGLE (preserves current type) */}
+            <div className="flex gap-1 bg-zinc-900 p-1 rounded-full w-fit">
+              <Link 
+                href={`/?type=${activeType}&time_range=short_term`} 
+                className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${
+                  activeTimeRange === 'short_term' ? 'bg-green-500 text-black' : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                Past Month
+              </Link>
+              <Link 
+                href={`/?type=${activeType}&time_range=medium_term`} 
+                className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${
+                  activeTimeRange === 'medium_term' ? 'bg-green-500 text-black' : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                Past 6 Months
+              </Link>
+              <Link 
+                href={`/?type=${activeType}&time_range=long_term`} 
+                className={`px-4 py-2 rounded-full text-sm font-bold transition-all ${
+                  activeTimeRange === 'long_term' ? 'bg-green-500 text-black' : 'text-zinc-400 hover:text-white'
+                }`}
+              >
+                Lifetime
+              </Link>
+            </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {topTracks.map((track: any, index: number) => (
-            <div key={track.id} className="bg-zinc-900 p-4 rounded-xl flex items-center gap-4 hover:bg-zinc-800 transition-colors">
-              <span className="text-zinc-500 font-bold text-xl w-6">{index + 1}</span>
-              {track.album.images[0] && (
-                <Image 
-                  src={track.album.images[0].url} 
-                  alt={track.album.name} 
-                  width={64} 
-                  height={64} 
-                  className="rounded-md"
-                />
-              )}
-              <div className="flex flex-col overflow-hidden">
-                <span className="font-bold truncate">{track.name}</span>
-                <span className="text-zinc-400 text-sm truncate">
-                  {track.artists.map((a: any) => a.name).join(", ")}
-                </span>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+          {/* Dynamically map the data based on if it's an artist or track object */}
+          {topItems.map((item: any, index: number) => {
+            // Artists have images directly, tracks have them nested in the album object
+            const imageUrl = activeType === "artists" 
+              ? item.images?.[0]?.url 
+              : item.album?.images?.[0]?.url;
+              
+            // Artists use genres as subtitle, tracks use artist names
+            const subtitle = activeType === "artists"
+              ? item.genres?.slice(0, 2).join(", ") || "Artist"
+              : item.artists?.map((a: any) => a.name).join(", ");
+
+            return (
+              <div key={item.id} className="bg-zinc-900 p-4 rounded-xl flex items-center gap-4 hover:bg-zinc-800 transition-colors">
+                <span className="text-zinc-500 font-bold text-xl w-6 flex-shrink-0">{index + 1}</span>
+                {imageUrl && (
+                  <Image 
+                    src={imageUrl} 
+                    alt={item.name} 
+                    width={64} 
+                    height={64} 
+                    className={`object-cover ${activeType === 'artists' ? 'rounded-full' : 'rounded-md'}`}
+                  />
+                )}
+                <div className="flex flex-col overflow-hidden">
+                  <span className="font-bold truncate">{item.name}</span>
+                  <span className="text-zinc-400 text-sm truncate capitalize">
+                    {subtitle}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
     </main>
